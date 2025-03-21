@@ -1,0 +1,55 @@
+name: Build and publish Docker image (GHCR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      vb_version:
+        default: "14.0.0"
+        description: 'Version of VocBench3 to build and push'
+        type: string
+      st_version:
+        default: "14.0"
+        description: 'Version of Semantic Turkey to build and push'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build and Push
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            ${{ github.event.inputs.vb_version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VOCBENCH_VERSION=${{ github.event.inputs.vb_version }}
+            SEMANTIC_TURKEY_VERSION=${{ github.event.inputs.st_version }}
